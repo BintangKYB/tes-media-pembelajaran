@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual 3D Bangun Ruang - Hand Tracking (Max Detection Fix)</title>
+  <style>
+    body { margin:0; font-family:Arial,sans-serif; background:#e8f5e9; color:#333; }
+    header { background:#1b5e20; color:#fff; padding:20px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
+    .logo { width:90px; margin:10px auto; display:block; }
+    h1 { font-size:24px; margin:10px 0; }
+    .subtitle { font-size:16px; font-style:italic; }
+    .author { font-weight:bold; font-size:20px; margin:10px; }
+    #container { width:100%; height:65vh; background:#f0f8ff; position:relative; overflow:hidden; }
+    .controls { text-align:center; padding:15px; background:#fff; box-shadow:0 -4px 15px rgba(0,0,0,0.1); }
+    button { margin:6px; padding:12px 24px; background:#2e7d32; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:16px; transition:all 0.3s; }
+    button:hover { background:#1b5e20; transform:translateY(-2px); }
+    button.active { background:#1b5e20; box-shadow:0 0 15px #4caf50; font-weight:bold; }
+    .tools { position:fixed; top:15px; right:15px; z-index:100; background:rgba(0,0,0,0.75); color:#fff; padding:12px; border-radius:12px; font-size:14px; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
+    .tools button { background:none; border:none; color:#fff; margin:6px 0; cursor:pointer; display:block; width:100%; text-align:left; }
+    #info { margin:20px; padding:20px; background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.1); }
+    .saintifik { background:#e8f5e9; border-left:6px solid #4caf50; padding:18px; margin:15px 0; border-radius:8px; }
+    .komunikasi { background:#fff3e0; border-left:6px solid #ff9800; padding:18px; margin:15px 0; border-radius:8px; }
+    .label-sudut { position:absolute; background:#fff; color:#d32f2f; font-weight:bold; padding:6px 10px; border-radius:50%; font-size:18px; pointer-events:none; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.4); transform:translate(-50%,-50%); }
+    #handStatus { color:#d32f2f; font-weight:bold; margin:10px; text-align:center; font-size:18px; padding:10px; background:#fff3e0; border-radius:8px; }
+    #debugCanvas { border: 3px solid #d32f2f; margin: 10px auto; display: block; max-width: 320px; background:#000; }
+    footer { text-align:center; padding:20px; background:#1b5e20; color:#fff; font-size:14px; }
+  </style>
+</head>
+<body>
+<header>
+  <img src="https://upload.wikimedia.org/wikipedia/id/1/1f/Logo_IKIP_Siliwangi.png" alt="IKIP Siliwangi" class="logo">
+  <h1>PENGEMBANGAN VISUAL 3D INTERAKTIF DENGAN HAND TRACKING</h1>
+  <p class="subtitle">Pendekatan Saintifik Berbantuan Computer Vision pada Materi Bangun Ruang Sisi Datar</p>
+  <div class="author">Bintang Ramadhan — 23510048 — IKIP Siliwangi 2025/2026</div>
+</header>
+
+<div id="container"></div>
+
+<canvas id="debugCanvas" width="320" height="240"></canvas>
+<div id="handStatus">Hand Tracking: Klik tombol → izinkan kamera → gerakkan tangan telapak terbuka lebar di depan kamera (jarak 20–50 cm, ruangan sangat terang)</div>
+
+<div class="controls">
+  <button class="btn active" data-shape="kubus">Kubus</button>
+  <button class="btn" data-shape="balok">Balok</button>
+  <button class="btn" data-shape="prismaSegitiga">Prisma Segitiga</button>
+  <button class="btn" data-shape="limasSegitiga">Limas Segitiga</button>
+  <button class="btn" data-shape="limasSegiempat">Limas Segiempat</button>
+  <button class="btn" data-shape="tabung">Tabung</button>
+  <button class="btn" data-shape="kerucut">Kerucut</button>
+  <button class="btn" data-shape="bola">Bola</button>
+</div>
+
+<div class="tools">
+  <button id="rotasi">⏸ Rotasi</button>
+  <button id="wireframe">Wireframe</button>
+  <button id="labels">Label Sudut</button>
+  <button id="shadows">Shadows</button>
+  <button id="handTrack">🖐 Hand Track</button>
+  <button id="reset">↻ Reset</button>
+  <button id="fullscreen">⛶ Fullscreen</button>
+</div>
+
+<div id="info">
+  <h2 id="title">Bangun Ruang: Kubus</h2>
+  <p id="formula">Volume = s × s × s = s³</p>
+  <div id="props"></div>
+  <div class="saintifik">
+    <h3>Pendekatan Saintifik (5M)</h3>
+    <ol>
+      <li><strong>Mengamati</strong>: Gerakkan tangan, amati apakah garis hijau muncul di kotak merah</li>
+      <li><strong>Menanya</strong>: Mengapa tangan harus telapak terbuka dan terang?</li>
+      <li><strong>Mengumpulkan Informasi</strong>: Hitung sisi, rusuk, sudut sambil interaksi</li>
+      <li><strong>Mengasosiasi</strong>: Kaitkan gestur dengan konsep ruang 3D</li>
+      <li><strong>Mengomunikasikan</strong>: Jelaskan pengalamanmu</li>
+    </ol>
+  </div>
+  <div class="komunikasi">
+    <h3>Latihan Komunikasi Matematik</h3>
+    <p><em>Tuliskan penjelasan (minimal 3 kalimat):</em></p>
+    <details><summary>Contoh</summary>
+      <p style="background:#fff;padding:15px;border:1px solid #ddd;margin-top:10px;">
+        Saya menggunakan tangan untuk menggerakkan model kubus di ruang 3D. Pinch jari memungkinkan kontrol posisi dan rotasi. Fitur ini membantu memahami konsep bangun ruang secara langsung dan menyenangkan.
+      </p>
+    </details>
+  </div>
+</div>
+
+<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Tes di ruangan sangat terang</footer>
+
+<video id="webcam" autoplay playsinline style="display:none;"></video>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+  const { HandLandmarker, FilesetResolver, DrawingUtils } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+
+  const container = document.getElementById('container');
+  const video = document.getElementById('webcam');
+  const handStatus = document.getElementById('handStatus');
+  const debugCanvas = document.getElementById('debugCanvas');
+
+  let scene, camera, renderer, orbitControls;
+  let currentMesh, wireHelper;
+  let isRotating = true;
+  let isWireframe = false;
+  let showLabels = true;
+  let labels = [];
+  let handLandmarker;
+  let handTrackActive = false;
+  let lastVideoTime = -1;
+  let isGrabbing = false;
+  let lastDetectionTime = 0;
+  let previewLoopId = null;
+  let drawingUtils;
+
+  async function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf0f8ff);
+    camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(0, 6, 12);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.05;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(10, 15, 10);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 100),
+      new THREE.ShadowMaterial({ opacity: 0.3 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -3;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    animate();
+  }
+
+  async function createHandLandmarker() {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+    handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task`,
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numHands: 1,
+      minHandDetectionConfidence: 0.05,
+      minHandPresenceConfidence: 0.05,
+      minTrackingConfidence: 0.05
+    });
+
+    drawingUtils = new DrawingUtils(debugCanvas.getContext('2d'));
+    console.log("HandLandmarker loaded - confidence sangat rendah (0.05) untuk memaksimalkan deteksi");
+  }
+
+  function previewDraw() {
+    if (!handTrackActive || !video.srcObject) {
+      previewLoopId = null;
+      return;
+    }
+
+    const ctx = debugCanvas.getContext('2d');
+
+    if (video.readyState >= 2) {
+      ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
+    } else {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, debugCanvas.width, debugCanvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText('Menunggu kamera...', 20, debugCanvas.height / 2);
+    }
+
+    previewLoopId = requestAnimationFrame(previewDraw);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const now = performance.now();
+
+    if (handTrackActive && video.readyState >= video.HAVE_CURRENT_DATA) {
+      if (now - lastDetectionTime > 15) {  // deteksi sangat sering (~66 FPS max)
+        lastDetectionTime = now;
+        if (video.currentTime !== lastVideoTime) {
+          lastVideoTime = video.currentTime;
+          console.log("Memulai deteksi frame pada:", now);
+          handLandmarker.detectForVideo(video, now, (result) => {
+            processHandResults(result);
+          });
+        }
+      }
+    }
+
+    if (isRotating && currentMesh && !handTrackActive) {
+      currentMesh.rotation.y += 0.005;
+      if (wireHelper) wireHelper.rotation.y += 0.005;
+    }
+
+    updateLabels();
+    orbitControls.update();
+    renderer.render(scene, camera);
+  }
+
+  function processHandResults(results) {
+    console.log('Hasil deteksi lengkap:', results);
+
+    if (!results.landmarks || results.landmarks.length === 0) {
+      console.warn("TIDAK ADA LANDMARK TERDETEKSI - coba telapak terbuka lebar, terang depan, dekatkan tangan");
+      isGrabbing = false;
+      handStatus.textContent = "Tidak terdeteksi - pastikan telapak menghadap kamera, jari terentang, ruangan sangat terang";
+      return;
+    }
+
+    console.log("LANDMARK TERDETEKSI! Jumlah landmark:", results.landmarks[0].length);
+    handStatus.textContent = "Tangan terdeteksi! Coba pinch (jempol + telunjuk rapat) & gerakkan";
+
+    // Gambar landmark di canvas
+    for (const landmarks of results.landmarks) {
+      drawingUtils.drawLandmarks(landmarks, { color: '#00FF00', lineWidth: 2, radius: 5 });
+      drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+    }
+
+    // Kontrol bentuk 3D
+    const landmarks = results.landmarks[0];
+    const mcpMiddle = landmarks[9];
+    const thumbTip = landmarks[4];
+    const indexTip = landmarks[8];
+
+    const pinchDist = Math.hypot(
+      thumbTip.x - indexTip.x,
+      thumbTip.y - indexTip.y,
+      thumbTip.z - indexTip.z
+    );
+
+    isGrabbing = pinchDist < 0.15;  // threshold lebih longgar
+
+    if (isGrabbing && currentMesh) {
+      const x = (mcpMiddle.x - 0.5) * 20;
+      const y = (0.5 - mcpMiddle.y) * 15;
+      const wrist = landmarks[0];
+      const pipMiddle = landmarks[10];
+      const depthDist = Math.hypot(wrist.x - pipMiddle.x, wrist.y - pipMiddle.y);
+      const z = THREE.MathUtils.mapLinear(depthDist, 0, 0.4, 10, -10);
+
+      currentMesh.position.set(x, y, z);
+      currentMesh.rotation.y = (mcpMiddle.x - 0.5) * Math.PI * 2;
+      console.log("Bentuk digerakkan - pinch aktif");
+    }
+  }
+
+  function loadShape(shape) {
+    if (currentMesh) scene.remove(currentMesh);
+    if (wireHelper) scene.remove(wireHelper);
+    labels.forEach(l => l.el.remove());
+    labels = [];
+
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-shape="${shape}"]`).classList.add('active');
+
+    let geo, title, formula, props, vertexCount = 0, isPolyhedral = true;
+    switch (shape) {
+      case 'kubus':
+        geo = new THREE.BoxGeometry(4, 4, 4); vertexCount = 8;
+        title = 'Bangun Ruang: Kubus'; formula = 'Volume = s × s × s = s³';
+        props = 'Sisi: 6 (persegi) | Rusuk: 12 | Titik Sudut: 8';
+        break;
+      case 'balok':
+        geo = new THREE.BoxGeometry(6, 4, 2); vertexCount = 8;
+        title = 'Bangun Ruang: Balok'; formula = 'Volume = p × l × t';
+        props = 'Sisi: 6 (persegi panjang) | Rusuk: 12 | Titik Sudut: 8';
+        break;
+      case 'prismaSegitiga':
+        geo = new THREE.CylinderGeometry(2.5, 2.5, 6, 3); vertexCount = 6;
+        title = 'Bangun Ruang: Prisma Segitiga'; formula = 'Volume = Luas alas × tinggi';
+        props = 'Sisi: 5 | Rusuk: 9 | Titik Sudut: 6';
+        break;
+      case 'limasSegitiga':
+        geo = new THREE.ConeGeometry(3.5, 6, 3); vertexCount = 4;
+        title = 'Bangun Ruang: Limas Segitiga'; formula = 'Volume = (1/3) × Luas alas × tinggi';
+        props = 'Sisi: 4 | Rusuk: 6 | Titik Sudut: 4';
+        break;
+      case 'limasSegiempat':
+        geo = new THREE.ConeGeometry(3.5, 6, 4); vertexCount = 5;
+        title = 'Bangun Ruang: Limas Segiempat'; formula = 'Volume = (1/3) × Luas alas × tinggi';
+        props = 'Sisi: 5 | Rusuk: 8 | Titik Sudut: 5';
+        break;
+      case 'tabung':
+        geo = new THREE.CylinderGeometry(2, 2, 7, 32); vertexCount = 0;
+        title = 'Bangun Ruang: Tabung'; formula = 'Volume = π r² t';
+        props = 'Sisi: 3 | Rusuk: 2 | Titik Sudut: 0';
+        isPolyhedral = false;
+        break;
+      case 'kerucut':
+        geo = new THREE.ConeGeometry(3, 7, 32); vertexCount = 1;
+        title = 'Bangun Ruang: Kerucut'; formula = 'Volume = (1/3) π r² t';
+        props = 'Sisi: 2 | Rusuk: 1 | Titik Sudut: 1';
+        isPolyhedral = false;
+        break;
+      case 'bola':
+        geo = new THREE.SphereGeometry(3.5, 32, 24); vertexCount = 0;
+        title = 'Bangun Ruang: Bola'; formula = 'Volume = (4/3) π r³';
+        props = 'Sisi: 1 | Rusuk: 0 | Titik Sudut: 0';
+        isPolyhedral = false;
+        break;
+    }
+
+    const mat = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.5, metalness: 0.1 });
+    currentMesh = new THREE.Mesh(geo, mat);
+    currentMesh.castShadow = true;
+    currentMesh.receiveShadow = true;
+    scene.add(currentMesh);
+
+    updateWireframe(isPolyhedral);
+
+    document.getElementById('title').textContent = title;
+    document.getElementById('formula').textContent = formula;
+    document.getElementById('props').innerHTML = props;
+
+    if (showLabels && vertexCount > 0) addLabels(vertexCount, geo);
+  }
+
+  function updateWireframe(isPolyhedral) {
+    if (wireHelper) scene.remove(wireHelper);
+    if (!isWireframe) return;
+    let wireGeo, wireMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+    if (isPolyhedral) {
+      wireGeo = new THREE.EdgesGeometry(currentMesh.geometry, 30);
+    } else {
+      wireGeo = new THREE.WireframeGeometry(currentMesh.geometry);
+    }
+    wireHelper = new THREE.LineSegments(wireGeo, wireMat);
+    scene.add(wireHelper);
+  }
+
+  function addLabels(maxCount, geometry) {
+    const pos = geometry.attributes.position;
+    const seen = new Set();
+    let idx = 0;
+    for (let i = 0; i < pos.count && idx < maxCount; i++) {
+      const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      const key = v.toArray().map(n => n.toFixed(2)).join(',');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const label = document.createElement('div');
+      label.className = 'label-sudut';
+      label.textContent = String.fromCharCode(65 + idx);
+      container.appendChild(label);
+      labels.push({ el: label, pos: v.clone() });
+      idx++;
+    }
+  }
+
+  function updateLabels() {
+    labels.forEach(({ el, pos }) => {
+      const world = pos.clone().applyMatrix4(currentMesh.matrixWorld);
+      const proj = world.project(camera);
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      el.style.left = ((proj.x * 0.5 + 0.5) * w) + 'px';
+      el.style.top = ((0.5 - proj.y * 0.5) * h) + 'px';
+    });
+  }
+
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', () => loadShape(btn.dataset.shape));
+  });
+
+  document.getElementById('rotasi').onclick = () => {
+    isRotating = !isRotating;
+    document.getElementById('rotasi').textContent = isRotating ? '▶ Rotasi' : '⏸ Rotasi';
+  };
+
+  document.getElementById('wireframe').onclick = () => {
+    isWireframe = !isWireframe;
+    updateWireframe(currentMesh?.geometry.type.includes('Box') || (currentMesh?.geometry.parameters?.radialSegments <= 4));
+    document.getElementById('wireframe').classList.toggle('active', isWireframe);
+  };
+
+  document.getElementById('labels').onclick = () => {
+    showLabels = !showLabels;
+    if (!showLabels) {
+      labels.forEach(l => l.el.remove());
+      labels = [];
+    } else if (currentMesh) {
+      let vc = 0;
+      if (currentMesh.geometry.type.includes('Box')) vc = 8;
+      else if (currentMesh.geometry.parameters?.radialSegments === 3) vc = 6;
+      else if (currentMesh.geometry.parameters?.radialSegments === 4) vc = 5;
+      if (vc > 0) addLabels(vc, currentMesh.geometry);
+    }
+    document.getElementById('labels').classList.toggle('active', showLabels);
+  };
+
+  document.getElementById('shadows').onclick = () => {
+    renderer.shadowMap.enabled = !renderer.shadowMap.enabled;
+    document.getElementById('shadows').classList.toggle('active', renderer.shadowMap.enabled);
+  };
+
+  document.getElementById('handTrack').onclick = async () => {
+    handTrackActive = !handTrackActive;
+    document.getElementById('handTrack').classList.toggle('active', handTrackActive);
+    document.getElementById('handTrack').textContent = handTrackActive ? '🖐 Hand Active' : '🖐 Hand Track';
+
+    if (handTrackActive) {
+      orbitControls.enabled = false;
+      if (!handLandmarker) {
+        try {
+          await createHandLandmarker();
+        } catch (err) {
+          console.error("Gagal load model:", err);
+          alert("Gagal memuat model MediaPipe: " + err.message);
+          handTrackActive = false;
+          return;
+        }
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            frameRate: { ideal: 30 }
+          }
+        });
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
+          video.play().then(() => {
+            console.log("Kamera playing, readyState:", video.readyState);
+            handStatus.textContent = "Kamera aktif - gerakkan tangan telapak terbuka lebar sekarang!";
+            if (!previewLoopId) {
+              previewLoopId = requestAnimationFrame(previewDraw);
+            }
+          }).catch(err => console.error("Play error:", err));
+        };
+
+        video.onplay = () => {
+          console.log("onplay triggered");
+          if (!previewLoopId) previewLoopId = requestAnimationFrame(previewDraw);
+        };
+
+      } catch (err) {
+        console.error("getUserMedia error:", err);
+        alert("Error akses kamera: " + err.message);
+        handTrackActive = false;
+        document.getElementById('handTrack').classList.remove('active');
+        document.getElementById('handTrack').textContent = '🖐 Hand Track';
+        orbitControls.enabled = true;
+      }
+    } else {
+      orbitControls.enabled = true;
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
+      if (previewLoopId) {
+        cancelAnimationFrame(previewLoopId);
+        previewLoopId = null;
+      }
+      const ctx = debugCanvas.getContext('2d');
+      ctx.clearRect(0, 0, debugCanvas.width, debugCanvas.height);
+      handStatus.textContent = "Hand Tracking dimatikan";
+    }
+  };
+
+  document.getElementById('reset').onclick = () => {
+    camera.position.set(0, 6, 12);
+    orbitControls.reset();
+    if (currentMesh) currentMesh.position.set(0,0,0);
+  };
+
+  document.getElementById('fullscreen').onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else container.requestFullscreen();
+  };
+
+  window.addEventListener('resize', () => {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+  });
+
+  init();
+  loadShape('kubus');
+</script>
+</body>
+</html>
