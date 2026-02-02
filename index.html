@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visual 3D Bangun Ruang - Hand Tracking (Versi Terbaru 2026)</title>
+  <title>Visual 3D Bangun Ruang - Hand Tracking (Final Optimized)</title>
   <style>
     body { margin:0; font-family:Arial,sans-serif; background:#e8f5e9; color:#333; }
     header { background:#1b5e20; color:#fff; padding:20px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
@@ -23,7 +23,7 @@
     .komunikasi { background:#fff3e0; border-left:6px solid #ff9800; padding:18px; margin:15px 0; border-radius:8px; }
     .label-sudut { position:absolute; background:#fff; color:#d32f2f; font-weight:bold; padding:6px 10px; border-radius:50%; font-size:18px; pointer-events:none; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.4); transform:translate(-50%,-50%); }
     #handStatus { color:#d32f2f; font-weight:bold; margin:10px; text-align:center; font-size:18px; padding:10px; background:#fff3e0; border-radius:8px; }
-    #debugCanvas { border: 3px solid #d32f2f; margin: 10px auto; display: block; max-width: 320px; background:#000; }
+    #debugCanvas { border: 3px solid #d32f2f; margin: 10px auto; display: block; width: 320px; height: 240px; background:#000; }
     footer { text-align:center; padding:20px; background:#1b5e20; color:#fff; font-size:14px; }
   </style>
 </head>
@@ -80,7 +80,7 @@
     <p><em>Tuliskan penjelasan (minimal 3 kalimat):</em></p>
     <details><summary>Contoh</summary>
       <p style="background:#fff;padding:15px;border:1px solid #ddd;margin-top:10px;">
-        Dengan hand tracking, saya bisa menggerakkan model kubus menggunakan tangan. Saat pinch jari, objek berpindah sesuai posisi telapak tangan. Fitur ini membuat pembelajaran bangun ruang lebih interaktif dan mudah dipahami siswa SMP.
+        Dengan hand tracking, saya bisa menggerakkan model kubus menggunakan gerakan tangan. Saat pinch jari, objek berpindah sesuai posisi telapak tangan. Fitur ini membuat pembelajaran bangun ruang lebih interaktif dan mudah dipahami siswa SMP.
       </p>
     </details>
   </div>
@@ -103,7 +103,6 @@
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-  // Gunakan versi terbaru (latest)
   const { HandLandmarker, FilesetResolver, DrawingUtils } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
 
   const container = document.getElementById('container');
@@ -175,7 +174,7 @@
     });
 
     drawingUtils = new DrawingUtils(debugCanvas.getContext('2d'));
-    console.log("HandLandmarker loaded - versi terbaru (latest), mirip demo resmi");
+    console.log("HandLandmarker loaded - versi latest, resolusi lebih tinggi, tanpa flip");
   }
 
   function previewDraw() {
@@ -187,10 +186,8 @@
     const ctx = debugCanvas.getContext('2d');
 
     if (video.readyState >= 2) {
-      ctx.save();
-      ctx.scale(-1, 1);  // flip horizontal agar sesuai webcam mirror (demo resmi sering pakai ini)
-      ctx.drawImage(video, -debugCanvas.width, 0, debugCanvas.width, debugCanvas.height);
-      ctx.restore();
+      // Tanpa flip - frame normal
+      ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
     } else {
       ctx.fillStyle = '#333';
       ctx.fillRect(0, 0, debugCanvas.width, debugCanvas.height);
@@ -233,7 +230,7 @@
     console.log('Hasil deteksi:', results);
 
     if (!results.landmarks || results.landmarks.length === 0) {
-      console.warn("No landmarks detected - coba pose persis seperti di demo resmi");
+      console.warn("No landmarks detected - pastikan pose sama seperti di demo resmi");
       isGrabbing = false;
       return;
     }
@@ -440,8 +437,8 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 320 },
-            height: { ideal: 240 },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
             frameRate: { ideal: 30 }
           }
         });
