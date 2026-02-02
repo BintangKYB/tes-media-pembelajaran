@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visual 3D Bangun Ruang - Hand Tracking (Max Detection Fix)</title>
+  <title>Visual 3D Bangun Ruang - Hand Tracking (Synced with Demo)</title>
   <style>
     body { margin:0; font-family:Arial,sans-serif; background:#e8f5e9; color:#333; }
     header { background:#1b5e20; color:#fff; padding:20px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
@@ -68,8 +68,8 @@
   <div class="saintifik">
     <h3>Pendekatan Saintifik (5M)</h3>
     <ol>
-      <li><strong>Mengamati</strong>: Gerakkan tangan, amati apakah garis hijau muncul di kotak merah</li>
-      <li><strong>Menanya</strong>: Mengapa tangan harus telapak terbuka dan terang?</li>
+      <li><strong>Mengamati</strong>: Gerakkan tangan, amati garis hijau di kotak merah</li>
+      <li><strong>Menanya</strong>: Mengapa tangan harus telapak menghadap kamera?</li>
       <li><strong>Mengumpulkan Informasi</strong>: Hitung sisi, rusuk, sudut sambil interaksi</li>
       <li><strong>Mengasosiasi</strong>: Kaitkan gestur dengan konsep ruang 3D</li>
       <li><strong>Mengomunikasikan</strong>: Jelaskan pengalamanmu</li>
@@ -80,13 +80,13 @@
     <p><em>Tuliskan penjelasan (minimal 3 kalimat):</em></p>
     <details><summary>Contoh</summary>
       <p style="background:#fff;padding:15px;border:1px solid #ddd;margin-top:10px;">
-        Saya menggunakan tangan untuk menggerakkan model kubus di ruang 3D. Pinch jari memungkinkan kontrol posisi dan rotasi. Fitur ini membantu memahami konsep bangun ruang secara langsung dan menyenangkan.
+        Dengan hand tracking, saya bisa menggerakkan model kubus menggunakan tangan. Saat pinch jari, objek berpindah posisi sesuai gerakan telapak tangan. Fitur ini membuat pembelajaran bangun ruang lebih interaktif dan mudah dipahami.
       </p>
     </details>
   </div>
 </div>
 
-<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Tes di ruangan sangat terang</footer>
+<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Tes dengan pose seperti di demo resmi</footer>
 
 <video id="webcam" autoplay playsinline style="display:none;"></video>
 
@@ -168,13 +168,13 @@
       },
       runningMode: "VIDEO",
       numHands: 1,
-      minHandDetectionConfidence: 0.05,
-      minHandPresenceConfidence: 0.05,
-      minTrackingConfidence: 0.05
+      minHandDetectionConfidence: 0.5,   // nilai seperti demo resmi
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5
     });
 
     drawingUtils = new DrawingUtils(debugCanvas.getContext('2d'));
-    console.log("HandLandmarker loaded - confidence sangat rendah (0.05) untuk memaksimalkan deteksi");
+    console.log("HandLandmarker loaded dengan konfigurasi mirip demo resmi");
   }
 
   function previewDraw() {
@@ -186,7 +186,10 @@
     const ctx = debugCanvas.getContext('2d');
 
     if (video.readyState >= 2) {
-      ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
+      ctx.save();
+      ctx.scale(-1, 1);  // flip horizontal agar seperti mirror webcam (demo resmi sering pakai ini)
+      ctx.drawImage(video, -debugCanvas.width, 0, debugCanvas.width, debugCanvas.height);
+      ctx.restore();
     } else {
       ctx.fillStyle = '#333';
       ctx.fillRect(0, 0, debugCanvas.width, debugCanvas.height);
@@ -204,11 +207,10 @@
     const now = performance.now();
 
     if (handTrackActive && video.readyState >= video.HAVE_CURRENT_DATA) {
-      if (now - lastDetectionTime > 15) {  // deteksi sangat sering (~66 FPS max)
+      if (now - lastDetectionTime > 20) {  // deteksi cepat seperti demo
         lastDetectionTime = now;
         if (video.currentTime !== lastVideoTime) {
           lastVideoTime = video.currentTime;
-          console.log("Memulai deteksi frame pada:", now);
           handLandmarker.detectForVideo(video, now, (result) => {
             processHandResults(result);
           });
@@ -227,25 +229,21 @@
   }
 
   function processHandResults(results) {
-    console.log('Hasil deteksi lengkap:', results);
+    console.log('Hasil deteksi:', results);
 
     if (!results.landmarks || results.landmarks.length === 0) {
-      console.warn("TIDAK ADA LANDMARK TERDETEKSI - coba telapak terbuka lebar, terang depan, dekatkan tangan");
+      console.warn("No landmarks - coba pose seperti di demo resmi");
       isGrabbing = false;
-      handStatus.textContent = "Tidak terdeteksi - pastikan telapak menghadap kamera, jari terentang, ruangan sangat terang";
       return;
     }
 
-    console.log("LANDMARK TERDETEKSI! Jumlah landmark:", results.landmarks[0].length);
-    handStatus.textContent = "Tangan terdeteksi! Coba pinch (jempol + telunjuk rapat) & gerakkan";
+    console.log("Landmarks detected! Score:", results.handednesses?.[0]?.score || 'N/A');
 
-    // Gambar landmark di canvas
     for (const landmarks of results.landmarks) {
       drawingUtils.drawLandmarks(landmarks, { color: '#00FF00', lineWidth: 2, radius: 5 });
       drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
     }
 
-    // Kontrol bentuk 3D
     const landmarks = results.landmarks[0];
     const mcpMiddle = landmarks[9];
     const thumbTip = landmarks[4];
@@ -257,7 +255,7 @@
       thumbTip.z - indexTip.z
     );
 
-    isGrabbing = pinchDist < 0.15;  // threshold lebih longgar
+    isGrabbing = pinchDist < 0.15;
 
     if (isGrabbing && currentMesh) {
       const x = (mcpMiddle.x - 0.5) * 20;
@@ -269,7 +267,6 @@
 
       currentMesh.position.set(x, y, z);
       currentMesh.rotation.y = (mcpMiddle.x - 0.5) * Math.PI * 2;
-      console.log("Bentuk digerakkan - pinch aktif");
     }
   }
 
@@ -433,7 +430,7 @@
           await createHandLandmarker();
         } catch (err) {
           console.error("Gagal load model:", err);
-          alert("Gagal memuat model MediaPipe: " + err.message);
+          alert("Gagal memuat model: " + err.message);
           handTrackActive = false;
           return;
         }
@@ -452,7 +449,7 @@
         video.onloadedmetadata = () => {
           video.play().then(() => {
             console.log("Kamera playing, readyState:", video.readyState);
-            handStatus.textContent = "Kamera aktif - gerakkan tangan telapak terbuka lebar sekarang!";
+            handStatus.textContent = "Kamera aktif - coba pose seperti di demo resmi!";
             if (!previewLoopId) {
               previewLoopId = requestAnimationFrame(previewDraw);
             }
