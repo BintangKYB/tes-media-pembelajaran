@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visual 3D Bangun Ruang - Hand Tracking (Synced with Demo)</title>
+  <title>Visual 3D Bangun Ruang - Hand Tracking (Versi Terbaru 2026)</title>
   <style>
     body { margin:0; font-family:Arial,sans-serif; background:#e8f5e9; color:#333; }
     header { background:#1b5e20; color:#fff; padding:20px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
@@ -38,7 +38,7 @@
 <div id="container"></div>
 
 <canvas id="debugCanvas" width="320" height="240"></canvas>
-<div id="handStatus">Hand Tracking: Klik tombol → izinkan kamera → gerakkan tangan telapak terbuka lebar di depan kamera (jarak 20–50 cm, ruangan sangat terang)</div>
+<div id="handStatus">Hand Tracking: Klik tombol → izinkan kamera → gunakan pose yang berhasil di demo resmi (telapak penuh menghadap kamera, jari terentang lebar, ruangan terang)</div>
 
 <div class="controls">
   <button class="btn active" data-shape="kubus">Kubus</button>
@@ -68,10 +68,10 @@
   <div class="saintifik">
     <h3>Pendekatan Saintifik (5M)</h3>
     <ol>
-      <li><strong>Mengamati</strong>: Gerakkan tangan, amati garis hijau di kotak merah</li>
-      <li><strong>Menanya</strong>: Mengapa tangan harus telapak menghadap kamera?</li>
+      <li><strong>Mengamati</strong>: Gerakkan tangan seperti di demo resmi, amati garis hijau di kotak merah</li>
+      <li><strong>Menanya</strong>: Apa yang membuat deteksi berhasil di demo resmi?</li>
       <li><strong>Mengumpulkan Informasi</strong>: Hitung sisi, rusuk, sudut sambil interaksi</li>
-      <li><strong>Mengasosiasi</strong>: Kaitkan gestur dengan konsep ruang 3D</li>
+      <li><strong>Mengasosiasi</strong>: Hubungkan gestur dengan konsep ruang 3D</li>
       <li><strong>Mengomunikasikan</strong>: Jelaskan pengalamanmu</li>
     </ol>
   </div>
@@ -80,13 +80,13 @@
     <p><em>Tuliskan penjelasan (minimal 3 kalimat):</em></p>
     <details><summary>Contoh</summary>
       <p style="background:#fff;padding:15px;border:1px solid #ddd;margin-top:10px;">
-        Dengan hand tracking, saya bisa menggerakkan model kubus menggunakan tangan. Saat pinch jari, objek berpindah posisi sesuai gerakan telapak tangan. Fitur ini membuat pembelajaran bangun ruang lebih interaktif dan mudah dipahami.
+        Dengan hand tracking, saya bisa menggerakkan model kubus menggunakan tangan. Saat pinch jari, objek berpindah sesuai posisi telapak tangan. Fitur ini membuat pembelajaran bangun ruang lebih interaktif dan mudah dipahami siswa SMP.
       </p>
     </details>
   </div>
 </div>
 
-<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Tes dengan pose seperti di demo resmi</footer>
+<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Versi terbaru MediaPipe</footer>
 
 <video id="webcam" autoplay playsinline style="display:none;"></video>
 
@@ -103,7 +103,8 @@
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-  const { HandLandmarker, FilesetResolver, DrawingUtils } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+  // Gunakan versi terbaru (latest)
+  const { HandLandmarker, FilesetResolver, DrawingUtils } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
 
   const container = document.getElementById('container');
   const video = document.getElementById('webcam');
@@ -159,22 +160,22 @@
 
   async function createHandLandmarker() {
     const filesetResolver = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
     );
     handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
-        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task`,
+        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
         delegate: "GPU"
       },
       runningMode: "VIDEO",
       numHands: 1,
-      minHandDetectionConfidence: 0.5,   // nilai seperti demo resmi
+      minHandDetectionConfidence: 0.5,
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
 
     drawingUtils = new DrawingUtils(debugCanvas.getContext('2d'));
-    console.log("HandLandmarker loaded dengan konfigurasi mirip demo resmi");
+    console.log("HandLandmarker loaded - versi terbaru (latest), mirip demo resmi");
   }
 
   function previewDraw() {
@@ -187,7 +188,7 @@
 
     if (video.readyState >= 2) {
       ctx.save();
-      ctx.scale(-1, 1);  // flip horizontal agar seperti mirror webcam (demo resmi sering pakai ini)
+      ctx.scale(-1, 1);  // flip horizontal agar sesuai webcam mirror (demo resmi sering pakai ini)
       ctx.drawImage(video, -debugCanvas.width, 0, debugCanvas.width, debugCanvas.height);
       ctx.restore();
     } else {
@@ -207,7 +208,7 @@
     const now = performance.now();
 
     if (handTrackActive && video.readyState >= video.HAVE_CURRENT_DATA) {
-      if (now - lastDetectionTime > 20) {  // deteksi cepat seperti demo
+      if (now - lastDetectionTime > 20) {
         lastDetectionTime = now;
         if (video.currentTime !== lastVideoTime) {
           lastVideoTime = video.currentTime;
@@ -232,7 +233,7 @@
     console.log('Hasil deteksi:', results);
 
     if (!results.landmarks || results.landmarks.length === 0) {
-      console.warn("No landmarks - coba pose seperti di demo resmi");
+      console.warn("No landmarks detected - coba pose persis seperti di demo resmi");
       isGrabbing = false;
       return;
     }
@@ -430,7 +431,7 @@
           await createHandLandmarker();
         } catch (err) {
           console.error("Gagal load model:", err);
-          alert("Gagal memuat model: " + err.message);
+          alert("Gagal memuat model MediaPipe: " + err.message);
           handTrackActive = false;
           return;
         }
@@ -449,7 +450,7 @@
         video.onloadedmetadata = () => {
           video.play().then(() => {
             console.log("Kamera playing, readyState:", video.readyState);
-            handStatus.textContent = "Kamera aktif - coba pose seperti di demo resmi!";
+            handStatus.textContent = "Kamera aktif - gunakan pose persis seperti di demo resmi!";
             if (!previewLoopId) {
               previewLoopId = requestAnimationFrame(previewDraw);
             }
