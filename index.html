@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visual 3D Bangun Ruang - Gesture Hand Tracking</title>
+  <title>Visual 3D Bangun Ruang - Handpose TensorFlow.js</title>
   <style>
     body { margin:0; font-family:Arial,sans-serif; background:#e8f5e9; color:#333; }
     header { background:#1b5e20; color:#fff; padding:20px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
@@ -30,15 +30,15 @@
 <body>
 <header>
   <img src="https://upload.wikimedia.org/wikipedia/id/1/1f/Logo_IKIP_Siliwangi.png" alt="IKIP Siliwangi" class="logo">
-  <h1>PENGEMBANGAN VISUAL 3D INTERAKTIF DENGAN GESTURE HAND TRACKING</h1>
-  <p class="subtitle">Pendekatan Saintifik Berbantuan MediaPipe Hands pada Materi Bangun Ruang Sisi Datar</p>
+  <h1>PENGEMBANGAN VISUAL 3D INTERAKTIF DENGAN HANDPOSE</h1>
+  <p class="subtitle">Pendekatan Saintifik Berbantuan TensorFlow.js pada Materi Bangun Ruang Sisi Datar</p>
   <div class="author">Bintang Ramadhan — 23510048 — IKIP Siliwangi 2025/2026</div>
 </header>
 
 <div id="container"></div>
 
 <canvas id="debugCanvas" width="320" height="240"></canvas>
-<div id="handStatus">Gesture Control: Klik tombol → izinkan kamera → pinch jempol & telunjuk untuk rotasi / gerakkan tangan untuk posisi</div>
+<div id="handStatus">Handpose: Klik tombol → izinkan kamera → gerakkan tangan telapak terbuka (jarak 30–60 cm, ruangan terang)</div>
 
 <div class="controls">
   <button class="btn active" data-shape="kubus">Kubus</button>
@@ -68,11 +68,11 @@
   <div class="saintifik">
     <h3>Pendekatan Saintifik (5M)</h3>
     <ol>
-      <li><strong>Mengamati</strong>: Gerakkan tangan, amati landmark hijau di preview</li>
-      <li><strong>Menanya</strong>: Bagaimana pinch & gerakan tangan mengontrol rotasi 3D?</li>
-      <li><strong>Mengumpulkan Informasi</strong>: Hitung sisi, rusuk, sudut sambil memutar objek</li>
-      <li><strong>Mengasosiasi</strong>: Hubungkan gestur dengan sumbu koordinat ruang</li>
-      <li><strong>Mengomunikasikan</strong>: Jelaskan pengalaman interaktifmu</li>
+      <li><strong>Mengamati</strong>: Gerakkan tangan, amati titik hijau di kotak merah</li>
+      <li><strong>Menanya</strong>: Mengapa pinch bisa kontrol objek 3D?</li>
+      <li><strong>Mengumpulkan Informasi</strong>: Hitung sisi, rusuk, sudut sambil interaksi</li>
+      <li><strong>Mengasosiasi</strong>: Hubungkan gestur dengan konsep ruang</li>
+      <li><strong>Mengomunikasikan</strong>: Jelaskan pengalamanmu</li>
     </ol>
   </div>
   <div class="komunikasi">
@@ -80,13 +80,13 @@
     <p><em>Tuliskan penjelasan (minimal 3 kalimat):</em></p>
     <details><summary>Contoh</summary>
       <p style="background:#fff;padding:15px;border:1px solid #ddd;margin-top:10px;">
-        Dengan gesture hand tracking, saya bisa memutar dan memindahkan model 3D menggunakan tangan secara real-time. Pinch jari mengaktifkan mode rotasi, sementara gerakan wrist mengontrol arah putaran. Fitur ini membuat pemahaman bangun ruang lebih kinestetik dan menarik bagi siswa.
+        Dengan handpose, saya bisa menggerakkan model kubus menggunakan tangan. Pinch jari memungkinkan kontrol posisi dan rotasi. Fitur ini membantu memahami bangun ruang secara langsung dan interaktif.
       </p>
     </details>
   </div>
 </div>
 
-<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Menggunakan Three.js + MediaPipe Hands</footer>
+<footer>© 2025/2026 Bintang Ramadhan — Skripsi Pendidikan Matematika IKIP Siliwangi | Menggunakan TensorFlow.js Handpose</footer>
 
 <video id="webcam" autoplay playsinline style="display:none;"></video>
 
@@ -102,7 +102,10 @@
 <script type="module">
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-  import { HandLandmarker, FilesetResolver, DrawingUtils } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest';
+
+  // TensorFlow.js & Handpose
+  const tf = await import('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest');
+  const handpose = await import('https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@latest');
 
   const container = document.getElementById('container');
   const video = document.getElementById('webcam');
@@ -111,24 +114,14 @@
 
   let scene, camera, renderer, orbitControls;
   let currentMesh, wireHelper;
-  let isAutoRotating = true;
+  let isRotating = true;
   let isWireframe = false;
   let showLabels = true;
   let labels = [];
+  let handposeModel;
   let handTrackActive = false;
-  let handLandmarker;
-  let lastVideoTime = -1;
+  let lastDetectionTime = 0;
   let previewLoopId = null;
-
-  // Gesture control variables
-  let prevWrist = { x: 0, y: 0 };
-  let isGrabbing = false;
-  const pinchThreshold = 40;          // pixel distance thumb-index
-  const rotationSensitivity = 0.003;  // adjust for comfort
-
-  const filesetResolverPromise = FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-  );
 
   async function init() {
     scene = new THREE.Scene();
@@ -160,120 +153,100 @@
     floor.receiveShadow = true;
     scene.add(floor);
 
+    // Load Handpose model
     try {
-      const vision = await filesetResolverPromise;
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task`,
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numHands: 1,
-        minHandDetectionConfidence: 0.7,
-        minHandPresenceConfidence: 0.7,
-        minTrackingConfidence: 0.7
-      });
-      handStatus.textContent = "MediaPipe Hands siap! Izinkan kamera & pinch untuk kontrol";
+      handposeModel = await handpose.load();
+      console.log("Handpose model loaded successfully");
+      handStatus.textContent = "Model Handpose siap! Klik tombol untuk mulai";
     } catch (err) {
-      console.error("Gagal load MediaPipe Hand Landmarker:", err);
-      handStatus.textContent = "Gagal memuat model. Periksa koneksi.";
+      console.error("Gagal load Handpose model:", err);
+      handStatus.textContent = "Gagal memuat model Handpose. Cek koneksi internet.";
     }
 
     animate();
   }
 
   function previewDraw() {
-    if (!handTrackActive || !video.srcObject) return;
-    const ctx = debugCanvas.getContext('2d');
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
+    if (!handTrackActive || !video.srcObject) {
+      previewLoopId = null;
+      return;
     }
+
+    const ctx = debugCanvas.getContext('2d');
+
+    if (video.readyState >= 2) {
+      ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
+    } else {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, debugCanvas.width, debugCanvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText('Menunggu kamera...', 20, debugCanvas.height / 2);
+    }
+
     previewLoopId = requestAnimationFrame(previewDraw);
   }
 
-  async function detectHands() {
-    if (!handLandmarker || !handTrackActive || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  async function detectHand() {
+    if (!handposeModel || !handTrackActive || video.readyState < 2) return;
 
-    if (video.currentTime !== lastVideoTime) {
-      lastVideoTime = video.currentTime;
-      const results = await handLandmarker.detectForVideo(video, performance.now());
+    const predictions = await handposeModel.estimateHands(video);
 
-      const ctx = debugCanvas.getContext('2d');
-      ctx.save();
-      ctx.clearRect(0, 0, debugCanvas.width, debugCanvas.height);
-      ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
+    const ctx = debugCanvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, debugCanvas.width, debugCanvas.height);
 
-      if (results.landmarks.length > 0) {
-        const drawingUtils = new DrawingUtils(ctx);
-        for (const landmarks of results.landmarks) {
-          drawingUtils.drawLandmarks(landmarks, {
-            color: '#00FF00',
-            lineWidth: 2,
-            radius: (data) => 5
-          });
-          drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, {
-            color: '#00FF00',
-            lineWidth: 3
-          });
+    if (predictions.length > 0) {
+      handStatus.textContent = "Tangan terdeteksi! Pinch jari untuk gerakkan bentuk";
+      console.log("Handpose detected:", predictions);
+
+      for (const prediction of predictions) {
+        const keypoints = prediction.landmarks;
+        for (const keypoint of keypoints) {
+          const [x, y] = keypoint;
+          ctx.beginPath();
+          ctx.arc(x * (debugCanvas.width / video.videoWidth), y * (debugCanvas.height / video.videoHeight), 5, 0, 2 * Math.PI);
+          ctx.fillStyle = '#00FF00';
+          ctx.fill();
+          ctx.strokeStyle = '#00FF00';
+          ctx.lineWidth = 2;
+          ctx.stroke();
         }
 
-        const landmarks = results.landmarks[0];
-        const wrist = landmarks[0];
-        const thumbTip = landmarks[4];
-        const indexTip = landmarks[8];
+        // Pinch detection: distance between thumb tip (4) and index tip (8)
+        const thumbTip = keypoints[4];
+        const indexTip = keypoints[8];
+        const pinchDist = Math.hypot(thumbTip[0] - indexTip[0], thumbTip[1] - indexTip[1]);
 
-        // Pinch detection (jarak Euclidean di image space)
-        const dx = (thumbTip.x - indexTip.x) * video.videoWidth;
-        const dy = (thumbTip.y - indexTip.y) * video.videoHeight;
-        const pinchDist = Math.hypot(dx, dy);
-        isGrabbing = pinchDist < pinchThreshold;
+        isGrabbing = pinchDist < 35;  // adjust this number if too sensitive or not sensitive enough
 
-        handStatus.textContent = isGrabbing
-          ? "Mode Kontrol Aktif: Gerakkan tangan untuk rotasi / posisi"
-          : "Tunjukkan pinch (jempol & telunjuk rapat) untuk kontrol";
+        if (isGrabbing && currentMesh) {
+          // Use wrist (0) for position control
+          const wrist = keypoints[0];
+          const x = (wrist[0] - video.videoWidth / 2) / (video.videoWidth / 2) * 15;
+          const y = (video.videoHeight / 2 - wrist[1]) / (video.videoHeight / 2) * 15;
+          const z = (pinchDist / 100) * -10; // closer pinch = move forward
 
-        if (currentMesh) {
-          if (isGrabbing) {
-            // Rotasi mode
-            const deltaX = wrist.x - prevWrist.x;
-            const deltaY = wrist.y - prevWrist.y;
-
-            currentMesh.rotation.y += deltaX * rotationSensitivity * 150;
-            currentMesh.rotation.x += deltaY * rotationSensitivity * 120;
-
-            // Roll (Z) dari sudut telapak (pinky base vs index base)
-            const pinkyBase = landmarks[17];
-            const indexBase = landmarks[5];
-            const roll = Math.atan2(pinkyBase.y - indexBase.y, pinkyBase.x - indexBase.x);
-            currentMesh.rotation.z = roll * 1.5;
-
-            if (wireHelper) wireHelper.rotation.copy(currentMesh.rotation);
-          } else {
-            // Translasi mode
-            const x = (wrist.x - 0.5) * 30;
-            const y = (0.5 - wrist.y) * 20;
-            const z = (pinchDist / 200 - 0.2) * -15;
-            currentMesh.position.set(x, y, z);
-          }
-
-          prevWrist = { x: wrist.x, y: wrist.y };
+          currentMesh.position.set(x, y, z);
         }
-      } else {
-        handStatus.textContent = "Tidak ada tangan terdeteksi – coba telapak terbuka, ruangan terang";
-        isGrabbing = false;
       }
-      ctx.restore();
+    } else {
+      handStatus.textContent = "Tidak mendeteksi tangan - coba telapak terbuka lebar, terang, dekatkan tangan";
     }
   }
 
   function animate() {
     requestAnimationFrame(animate);
 
-    if (handTrackActive) {
-      detectHands();
+    const now = performance.now();
+
+    if (handTrackActive && video.readyState >= video.HAVE_CURRENT_DATA) {
+      if (now - lastDetectionTime > 50) { // 20 fps detection - handpose is a bit heavier
+        lastDetectionTime = now;
+        detectHand();
+      }
     }
 
-    if (isAutoRotating && currentMesh && !handTrackActive) {
+    if (isRotating && currentMesh && !handTrackActive) {
       currentMesh.rotation.y += 0.005;
       if (wireHelper) wireHelper.rotation.y += 0.005;
     }
@@ -357,8 +330,7 @@
   function updateWireframe(isPolyhedral) {
     if (wireHelper) scene.remove(wireHelper);
     if (!isWireframe) return;
-    let wireGeo;
-    const wireMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+    let wireGeo, wireMat = new THREE.LineBasicMaterial({ color: 0xffffff });
     if (isPolyhedral) {
       wireGeo = new THREE.EdgesGeometry(currentMesh.geometry, 30);
     } else {
@@ -402,13 +374,13 @@
   });
 
   document.getElementById('rotasi').onclick = () => {
-    isAutoRotating = !isAutoRotating;
-    document.getElementById('rotasi').textContent = isAutoRotating ? '▶ Rotasi' : '⏸ Rotasi';
+    isRotating = !isRotating;
+    document.getElementById('rotasi').textContent = isRotating ? '▶ Rotasi' : '⏸ Rotasi';
   };
 
   document.getElementById('wireframe').onclick = () => {
     isWireframe = !isWireframe;
-    updateWireframe(currentMesh?.geometry.type.includes('Box') || currentMesh?.geometry.parameters?.radialSegments <= 4);
+    updateWireframe(currentMesh?.geometry.type.includes('Box') || (currentMesh?.geometry.parameters?.radialSegments <= 4));
     document.getElementById('wireframe').classList.toggle('active', isWireframe);
   };
 
@@ -434,28 +406,51 @@
 
   document.getElementById('handTrack').onclick = async () => {
     handTrackActive = !handTrackActive;
-    const btn = document.getElementById('handTrack');
-    btn.classList.toggle('active', handTrackActive);
-    btn.textContent = handTrackActive ? '🖐 Hand Active' : '🖐 Hand Track';
+    document.getElementById('handTrack').classList.toggle('active', handTrackActive);
+    document.getElementById('handTrack').textContent = handTrackActive ? '🖐 Hand Active' : '🖐 Hand Track';
 
     if (handTrackActive) {
       orbitControls.enabled = false;
+      if (!handposeModel) {
+        handStatus.textContent = "Memuat model Handpose...";
+        try {
+          handposeModel = await handpose.load();
+          console.log("Handpose model loaded");
+          handStatus.textContent = "Model Handpose siap! Gerakkan tangan telapak terbuka.";
+        } catch (err) {
+          console.error("Gagal load Handpose:", err);
+          handStatus.textContent = "Gagal memuat model Handpose. Cek koneksi.";
+          handTrackActive = false;
+          return;
+        }
+      }
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          }
         });
         video.srcObject = stream;
+
         video.onloadedmetadata = () => {
-          video.play().catch(e => console.error("Video play error:", e));
-          handStatus.textContent = "Kamera aktif – pinch untuk rotasi, lepas untuk posisi!";
-          if (!previewLoopId) previewLoopId = requestAnimationFrame(previewDraw);
+          video.play().then(() => {
+            console.log("Kamera playing");
+            handStatus.textContent = "Kamera aktif - gerakkan tangan telapak terbuka!";
+            if (!previewLoopId) {
+              previewLoopId = requestAnimationFrame(previewDraw);
+            }
+          }).catch(err => console.error("Play error:", err));
         };
+
       } catch (err) {
-        console.error("Kamera error:", err);
-        alert("Gagal akses kamera: " + err.message);
+        console.error("getUserMedia error:", err);
+        alert("Error akses kamera: " + err.message);
         handTrackActive = false;
-        btn.classList.remove('active');
-        btn.textContent = '🖐 Hand Track';
+        document.getElementById('handTrack').classList.remove('active');
+        document.getElementById('handTrack').textContent = '🖐 Hand Track';
         orbitControls.enabled = true;
       }
     } else {
@@ -468,7 +463,8 @@
         cancelAnimationFrame(previewLoopId);
         previewLoopId = null;
       }
-      debugCanvas.getContext('2d').clearRect(0, 0, debugCanvas.width, debugCanvas.height);
+      const ctx = debugCanvas.getContext('2d');
+      ctx.clearRect(0, 0, debugCanvas.width, debugCanvas.height);
       handStatus.textContent = "Hand Tracking dimatikan";
     }
   };
@@ -477,13 +473,11 @@
     camera.position.set(0, 6, 12);
     orbitControls.reset();
     if (currentMesh) currentMesh.position.set(0,0,0);
-    currentMesh.rotation.set(0,0,0);
-    if (wireHelper) wireHelper.rotation.set(0,0,0);
   };
 
   document.getElementById('fullscreen').onclick = () => {
     if (document.fullscreenElement) document.exitFullscreen();
-    else container.requestFullscreen().catch(e => console.error(e));
+    else container.requestFullscreen();
   };
 
   window.addEventListener('resize', () => {
