@@ -80,7 +80,7 @@
     <p><em>Tuliskan penjelasan (minimal 3 kalimat):</em></p>
     <details><summary>Contoh</summary>
       <p style="background:#fff;padding:15px;border:1px solid #ddd;margin-top:10px;">
-        Dengan handpose, saya bisa menggerakkan model kubus menggunakan tangan. Pinch jari memungkinkan kontrol posisi dan rotasi. Fitur ini membantu memahami bangun ruang secara langsung dan interaktif.
+        Dengan handpose TensorFlow.js, saya bisa menggerakkan model kubus menggunakan tangan. Saat pinch jari (jempol dan telunjuk rapat), objek berpindah posisi sesuai gerakan telapak. Fitur ini membuat pembelajaran bangun ruang lebih interaktif dan menyenangkan.
       </p>
     </details>
   </div>
@@ -160,7 +160,7 @@
       handStatus.textContent = "Model Handpose siap! Klik tombol untuk mulai";
     } catch (err) {
       console.error("Gagal load Handpose model:", err);
-      handStatus.textContent = "Gagal memuat model Handpose. Cek koneksi internet.";
+      handStatus.textContent = "Gagal memuat model Handpose. Pastikan koneksi internet stabil.";
     }
 
     animate();
@@ -217,14 +217,14 @@
         const indexTip = keypoints[8];
         const pinchDist = Math.hypot(thumbTip[0] - indexTip[0], thumbTip[1] - indexTip[1]);
 
-        isGrabbing = pinchDist < 35;  // adjust this number if too sensitive or not sensitive enough
+        isGrabbing = pinchDist < 35;  // sesuaikan angka ini jika terlalu sensitif / kurang sensitif
 
         if (isGrabbing && currentMesh) {
-          // Use wrist (0) for position control
+          // Gunakan wrist (0) untuk posisi X/Y, pinch untuk kedalaman Z
           const wrist = keypoints[0];
           const x = (wrist[0] - video.videoWidth / 2) / (video.videoWidth / 2) * 15;
           const y = (video.videoHeight / 2 - wrist[1]) / (video.videoHeight / 2) * 15;
-          const z = (pinchDist / 100) * -10; // closer pinch = move forward
+          const z = (pinchDist / 100) * -10; // pinch rapat = maju ke depan
 
           currentMesh.position.set(x, y, z);
         }
@@ -240,7 +240,7 @@
     const now = performance.now();
 
     if (handTrackActive && video.readyState >= video.HAVE_CURRENT_DATA) {
-      if (now - lastDetectionTime > 50) { // 20 fps detection - handpose is a bit heavier
+      if (now - lastDetectionTime > 50) {  // Handpose lebih berat, cukup 20 fps
         lastDetectionTime = now;
         detectHand();
       }
@@ -412,14 +412,14 @@
     if (handTrackActive) {
       orbitControls.enabled = false;
       if (!handposeModel) {
-        handStatus.textContent = "Memuat model Handpose...";
+        handStatus.textContent = "Memuat model Handpose... (pertama kali butuh internet)";
         try {
           handposeModel = await handpose.load();
           console.log("Handpose model loaded");
-          handStatus.textContent = "Model Handpose siap! Gerakkan tangan telapak terbuka.";
+          handStatus.textContent = "Model siap! Gerakkan tangan telapak terbuka.";
         } catch (err) {
           console.error("Gagal load Handpose:", err);
-          handStatus.textContent = "Gagal memuat model Handpose. Cek koneksi.";
+          handStatus.textContent = "Gagal memuat model. Pastikan koneksi internet.";
           handTrackActive = false;
           return;
         }
